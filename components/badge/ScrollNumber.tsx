@@ -3,7 +3,6 @@ import { createElement, Component } from 'react';
 import omit from 'omit.js';
 import classNames from 'classnames';
 import { ConfigConsumer, ConfigConsumerProps } from '../config-provider';
-import { polyfill } from 'react-lifecycles-compat';
 
 function getNumberArray(num: string | number | undefined | null) {
   return num
@@ -31,24 +30,13 @@ export interface ScrollNumberState {
   count?: string | number | null;
 }
 
-let lastCount: any;
-
-class ScrollNumber extends Component<ScrollNumberProps, ScrollNumberState> {
+export default class ScrollNumber extends Component<ScrollNumberProps, ScrollNumberState> {
   static defaultProps = {
     count: null,
     onAnimated() {},
   };
 
-  static getDerivedStateFromProps(nextProps: ScrollNumberProps, nextState: ScrollNumberState) {
-    if ('count' in nextProps) {
-      if (nextState.count === nextProps.count) {
-        return null;
-      }
-      lastCount = nextState.count;
-      return { animateStarted: true };
-    }
-    return null;
-  }
+  lastCount: any;
 
   constructor(props: ScrollNumberProps) {
     super(props);
@@ -63,9 +51,9 @@ class ScrollNumber extends Component<ScrollNumberProps, ScrollNumberState> {
       return 10 + num;
     }
     const currentDigit = getNumberArray(this.state.count)[i];
-    const lastDigit = getNumberArray(lastCount)[i];
+    const lastDigit = getNumberArray(this.lastCount)[i];
     // 同方向则在同一侧切换数字
-    if (this.state.count! > lastCount) {
+    if (this.state.count! > this.lastCount) {
       if (currentDigit >= lastDigit) {
         return 10 + num;
       }
@@ -77,14 +65,36 @@ class ScrollNumber extends Component<ScrollNumberProps, ScrollNumberState> {
     return num;
   }
 
-  componentDidUpdate() {
-    if (this.state.animateStarted) {
-      this.setState({ animateStarted: false, count: this.props.count }, () => {
-        const onAnimated = this.props.onAnimated;
-        if (onAnimated) {
-          onAnimated();
-        }
-      });
+  componentWillReceiveProps(nextProps: ScrollNumberProps) {
+    if ('count' in nextProps) {
+      if (this.state.count === nextProps.count) {
+        return;
+      }
+      this.lastCount = this.state.count;
+      // 复原数字初始位置
+      this.setState(
+        {
+          animateStarted: true,
+        },
+        () => {
+          // 等待数字位置复原完毕
+          // 开始设置完整的数字
+          setTimeout(() => {
+            this.setState(
+              {
+                animateStarted: false,
+                count: nextProps.count,
+              },
+              () => {
+                const onAnimated = this.props.onAnimated;
+                if (onAnimated) {
+                  onAnimated();
+                }
+              },
+            );
+          }, 5);
+        },
+      );
     }
   }
 
@@ -104,7 +114,7 @@ class ScrollNumber extends Component<ScrollNumberProps, ScrollNumberState> {
   renderCurrentNumber(prefixCls: string, num: number, i: number) {
     const position = this.getPositionByNum(num, i);
     const removeTransition =
-      this.state.animateStarted || getNumberArray(lastCount)[i] === undefined;
+      this.state.animateStarted || getNumberArray(this.lastCount)[i] === undefined;
     return createElement(
       'span',
       {
@@ -179,7 +189,3 @@ class ScrollNumber extends Component<ScrollNumberProps, ScrollNumberState> {
     return <ConfigConsumer>{this.renderScrollNumber}</ConfigConsumer>;
   }
 }
-
-polyfill(ScrollNumber);
-
-export default ScrollNumber;

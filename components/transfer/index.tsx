@@ -8,7 +8,6 @@ import warning from '../_util/warning';
 import LocaleReceiver from '../locale-provider/LocaleReceiver';
 import defaultLocale from '../locale-provider/default';
 import { ConfigConsumer, ConfigConsumerProps, RenderEmptyHandler } from '../config-provider';
-import { polyfill } from 'react-lifecycles-compat';
 
 export { TransferListProps } from './list';
 export { TransferOperationProps } from './operation';
@@ -63,7 +62,7 @@ export interface TransferLocale {
   itemsUnit: string;
 }
 
-class Transfer extends React.Component<TransferProps, any> {
+export default class Transfer extends React.Component<TransferProps, any> {
   // For high-level customized Transfer @dqaria
   static List = List;
   static Operation = Operation;
@@ -101,17 +100,6 @@ class Transfer extends React.Component<TransferProps, any> {
     lazy: PropTypes.oneOfType([PropTypes.object, PropTypes.bool]),
   };
 
-  static getDerivedStateFromProps(nextProps: TransferProps) {
-    if (nextProps.selectedKeys) {
-      const targetKeys = nextProps.targetKeys || [];
-      return {
-        sourceSelectedKeys: nextProps.selectedKeys.filter(key => !targetKeys.includes(key)),
-        targetSelectedKeys: nextProps.selectedKeys.filter(key => targetKeys.includes(key)),
-      };
-    }
-    return null;
-  }
-
   separatedDataSource: {
     leftDataSource: TransferItem[];
     rightDataSource: TransferItem[];
@@ -136,23 +124,24 @@ class Transfer extends React.Component<TransferProps, any> {
     };
   }
 
-  componentDidUpdate = (prevProps: TransferProps, prevState: any) => {
-    const { sourceSelectedKeys, targetSelectedKeys } = prevState;
+  componentWillReceiveProps(nextProps: TransferProps) {
+    const { sourceSelectedKeys, targetSelectedKeys } = this.state;
+
     if (
-      prevProps.targetKeys !== this.props.targetKeys ||
-      prevProps.dataSource !== this.props.dataSource
+      nextProps.targetKeys !== this.props.targetKeys ||
+      nextProps.dataSource !== this.props.dataSource
     ) {
       // clear cached separated dataSource
       this.separatedDataSource = null;
 
-      if (!prevProps.selectedKeys) {
+      if (!nextProps.selectedKeys) {
         // clear key no longer existed
         // clear checkedKeys according to targetKeys
-        const { dataSource, targetKeys = [] } = prevProps;
+        const { dataSource, targetKeys = [] } = nextProps;
 
         const newSourceSelectedKeys: String[] = [];
         const newTargetSelectedKeys: String[] = [];
-        dataSource.forEach(({ key }: { key: string }) => {
+        dataSource.forEach(({ key }) => {
           if (sourceSelectedKeys.includes(key) && !targetKeys.includes(key)) {
             newSourceSelectedKeys.push(key);
           }
@@ -166,7 +155,15 @@ class Transfer extends React.Component<TransferProps, any> {
         });
       }
     }
-  };
+
+    if (nextProps.selectedKeys) {
+      const targetKeys = nextProps.targetKeys || [];
+      this.setState({
+        sourceSelectedKeys: nextProps.selectedKeys.filter(key => !targetKeys.includes(key)),
+        targetSelectedKeys: nextProps.selectedKeys.filter(key => targetKeys.includes(key)),
+      });
+    }
+  }
 
   separateDataSource(props: TransferProps) {
     if (this.separatedDataSource) {
@@ -467,7 +464,3 @@ class Transfer extends React.Component<TransferProps, any> {
     );
   }
 }
-
-polyfill(Transfer);
-
-export default Transfer;
